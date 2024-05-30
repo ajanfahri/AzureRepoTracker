@@ -1,6 +1,7 @@
 package com.example.azurerepotracker
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,7 +33,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,6 +50,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.ui.unit.sp
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 
 class MainActivity : ComponentActivity() {
@@ -159,9 +167,13 @@ fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i para
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = repository.name, fontWeight = FontWeight.Bold) // Repo adını göster
+                Text(text = repository.name, fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp, // Yazı boyutunu büyüt
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) // Repo adını göster
 
                 repository.commits.last()?.let { commit -> // Son commit varsa
                     CommitItem(commit)
@@ -183,6 +195,7 @@ fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i para
 
 @Composable
 fun CommitItem(commit: Commit) {
+
     Card(modifier = Modifier
         .fillMaxWidth()
         .padding(8.dp)) {
@@ -193,7 +206,17 @@ fun CommitItem(commit: Commit) {
             // author ve commitId'yi ayrı ayrı göstermek için aşağıdaki gibi düzenleme yapılabilir.
 
             Text(text = "Author: ${commit.author?.name ?: "Bilinmiyor"}")
-            Text(text = "Commit ID: ${commit.commitId}")
+            //Text(text = "Commit ID: ${commit.commitId}")
+            //Text(text = "Commit DATE: ${commit.committer.date}")
+            // Tarih bilgisini ekliyoruz
+            // Tarih bilgisini ekliyoruz
+            commit.committer?.date?.let { dateString ->
+                val instant = Instant.parse(dateString) // null değilse parse etmeye çalış
+                val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
+                    .withLocale(Locale.getDefault())
+                val formattedDate = formatter.format(instant.atZone(ZoneId.systemDefault()))
+                Text(text = "Tarih: $formattedDate")
+            }
         }
     }
 }

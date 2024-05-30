@@ -62,16 +62,27 @@ class MainViewModel : ViewModel() {
         azureDevOpsApi = retrofit.create(AzureDevOpsApi::class.java)
     }
 
+
+
+
     fun getRepositories() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null) // error'u null yap
             try {
-                val repositories = listOf(
-                    RepositoryInfo("fahreddintokatli", "ajan_windows"),
-                    RepositoryInfo("fahriborland", "hplin"),
-                    RepositoryInfo("fahriborland", "hpr130"),
-                    RepositoryInfo("fahriborland", "fib2000")
-                )
+
+
+                // BuildConfig'ten repository listesini okuma ve parçalama
+                val repositories = BuildConfig.REPO_LIST.split(",")
+                    .filter { it.isNotBlank() } // Boş öğeleri filtrele
+                    .map { repoString ->
+                        val parts = repoString.split("/")
+                        RepositoryInfo(parts[0], parts[1])
+                    } // RepositoryInfo nesnelerine dönüştürme
+
+                // Artık repositories listesi kullanıma hazır
+                repositories.forEach { repo ->
+                    println("Owner: ${repo.organizationName}, Name: ${repo.repoName}")
+                }
 
                 val repositoryResults = mutableListOf<Repository>()
                 for (repoInfo in repositories) {

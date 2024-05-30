@@ -28,6 +28,9 @@ android {
         buildConfigField("String", "PROJECT_NAME", getLocalProperty("PROJECT_NAME") ?: "default_value")
         buildConfigField("String", "REPO_NAME", getLocalProperty("REPO_NAME") ?: "default_value")
 
+        buildConfigField("String", "REPO_LIST", "\"${getLocalProperty("REPO_LIST") ?: ""}\"")
+
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -78,6 +81,10 @@ fun getLocalProperty(name: String): String? {
         null
     }
 }
+
+
+// RepositoryInfo veri sınıfı
+data class RepositoryInfo(val owner: String, val name: String)
 dependencies {
     implementation(platform(libs.androidx.compose.bom)) // Compose BOM'u kullanın
 
