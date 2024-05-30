@@ -1,6 +1,7 @@
 package com.example.azurerepotracker.ui.theme
 
 import android.util.Base64
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,11 +19,17 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import com.example.azurerepotracker.BuildConfig // Uygulama adınızı doğru şekilde yazın
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class MainViewModel : ViewModel() {
 
-    var uiState by mutableStateOf(UiState())
-        private set
+/*    var uiState by mutableStateOf(UiState())
+        private set*/
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow() // StateFlow olarak expose edin
+
 
     private val azureDevOpsApi: AzureDevOpsApi
 
@@ -57,6 +64,54 @@ class MainViewModel : ViewModel() {
 
     fun getRepositories() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null) // error'u null yap
+            try {
+                val repositories = listOf(
+                    RepositoryInfo("fahreddintokatli", "ajan_windows"),
+                    RepositoryInfo("fahriborland", "hplin"),
+                    RepositoryInfo("fahriborland", "hpr130"),
+                    RepositoryInfo("fahriborland", "fib2000")
+                )
+
+                val repositoryResults = mutableListOf<Repository>()
+                for (repoInfo in repositories) {
+                    azureDevOpsApi.getCommits(
+                        repoInfo.organizationName,
+                        repoInfo.repoName, // Proje adı tüm repolar için aynıysa
+                        repoInfo.repoName
+                    ).enqueue(object : Callback<CommitResponse> {
+                        override fun onResponse(call: Call<CommitResponse>, response: Response<CommitResponse>) {
+                            if (response.isSuccessful) {
+//                                val commits = response.body()?.value ?: emptyList()
+                                val commits = response.body()?.value?.toMutableList() ?: mutableListOf() // MutableList'e dönüştür
+
+                                // Commit listesini sondan başa doğru sırala
+                                commits.reverse()
+                                repositoryResults.add(Repository(repoInfo.repoName, commits))
+                                if (repositoryResults.size == repositories.size) {
+                                    _uiState.value = _uiState.value.copy(isLoading = false, repositories = repositoryResults)
+                                }
+                            } else {
+                                Log.e("API Error", "Hata Kodu: ${response.code()}. Hata Mesajı: ${response.errorBody()?.string()}")
+
+                                _uiState.value = _uiState.value.copy(isLoading = false, error = "API HATASI: ${response.code()}")
+                            }
+                        }
+
+                        override fun onFailure(call: Call<CommitResponse>, t: Throwable) {
+                            _uiState.value = _uiState.value.copy(isLoading = false, error = "Bir hata oluştu: ${t.message}")
+                        }
+                    })
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = "Bir hata oluştu: ${e.message}")
+            }
+        }
+
+
+    }
+    /*fun getRepositories() {
+        viewModelScope.launch {
             uiState = uiState.copy(isLoading = true)
             try {
                 azureDevOpsApi.getCommits(
@@ -82,11 +137,14 @@ class MainViewModel : ViewModel() {
                 uiState = uiState.copy(isLoading = false, error = "Bir hata oluştu: ${e.message}")
             }
         }
-    }
+    }*/
 }
+
+// Yardımcı veri sınıfı
+data class RepositoryInfo(val organizationName: String, val repoName: String)
 
 data class UiState(
     val isLoading: Boolean = false,
-    val repository: Repository? = null,
+    val repositories: MutableList<Repository> = mutableListOf(),
     val error: String? = null
 )

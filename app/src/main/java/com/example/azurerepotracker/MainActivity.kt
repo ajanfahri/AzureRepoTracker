@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,7 +43,11 @@ import com.example.azurerepotracker.ui.theme.AzureRepoTrackerTheme
 import com.example.azurerepotracker.ui.theme.MainViewModel
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import androidx.compose.ui.Alignment
+
+import androidx.compose.ui.text.font.FontWeight
+
+import androidx.compose.ui.unit.sp
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,7 +61,8 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AzureRepoTrackerApp() {
+fun AzureRepoTrackerApp(viewModel: MainViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState() // uiState'i collectAsState ile alın
 
     val retrofit = Retrofit.Builder()
         .baseUrl("https://dev.azure.com/")
@@ -69,7 +76,7 @@ fun AzureRepoTrackerApp() {
 
     LaunchedEffect(Unit) {
         viewModel.getRepositories()
-    }
+            }
 
     Scaffold(
         topBar = {
@@ -85,24 +92,43 @@ fun AzureRepoTrackerApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when {
-                viewModel.uiState.isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                uiState.isLoading -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        CircularProgressIndicator()
+                    }
                 }
-                viewModel.uiState.error != null -> {
+
+                uiState.error != null -> {
                     Text(
-                        text = "Hata: ${viewModel.uiState.error}",
+                        text = "Hata: ${uiState.error}",
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
                     )
                 }
                 else -> {
-                    viewModel.uiState.repository?.commits?.let { commits ->
+                    RepoListScreen(viewModel)
+                    /*viewModel.uiState.repositories.let { repositories -> // repositories listesini al
+                        if (repositories.isNotEmpty()) { // Liste boş değilse
+                            LazyColumn {
+                                items(repositories) { repository -> // Her repository için
+                                    repository.commits?.let { commits -> // Commitler varsa
+                                        items(commits) { commit ->
+                                            CommitItem(commit)
+                                        }
+                                    } ?: Text(text = "Bu repoda commit bulunamadı.") // Commit yoksa
+                                }
+                            }
+                        } else {
+                            Text(text = "Repo bulunamadı.", modifier = Modifier.align(Alignment.Center)) // Hiç repo yoksa
+                        }
+                    }*/
+                    /*viewModel.uiState.repository?.commits?.let { commits ->
                         LazyColumn {
                             items(commits) { commit ->
                                 CommitItem(commit)
                             }
                         }
-                    } ?: Text(text = "Repo bulunamadı.", modifier = Modifier.align(Alignment.Center)) // repository null ise yapılacaklar
+                    } ?: Text(text = "Repo bulunamadı.", modifier = Modifier.align(Alignment.Center)) */// repository null ise yapılacaklar
                 }
             }
         }
@@ -121,7 +147,57 @@ fun AzureRepoTrackerApp() {
         )
     }
 }
+@Composable
+fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i parametre olarak alır
 
+    val uiState by viewModel.uiState.collectAsState()  // collectAsState kullanın
+
+
+    LazyColumn {
+        items(uiState.repositories.size) { index -> // Her bir repository için bir öğe oluştur
+            val repository = uiState.repositories[index] // Geçerli repository'yi al
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Text(text = repository.name, fontWeight = FontWeight.Bold) // Repo adını göster
+
+                repository.commits.last()?.let { commit -> // Son commit varsa
+                    CommitItem(commit)
+                } ?: Text("Bu repoda commit bulunamadı.") // Commit yoksa mesaj göster
+            }
+        }
+
+        item { // Repo yoksa veya yüklenirken mesaj göster
+            if (uiState.isLoading) {
+                Text("Yükleniyor...")
+            } else if (uiState.repositories.isEmpty()) {
+                Text("Repo bulunamadı.")
+            } else if (uiState.error != null) {
+                Text("Hata: ${uiState.error}")
+            }
+        }
+    }
+}
+
+@Composable
+fun CommitItem(commit: Commit) {
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .padding(8.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            Text(text = commit.comment ?: "Commit Mesajı Yok")
+
+            // author ve commitId'yi ayrı ayrı göstermek için aşağıdaki gibi düzenleme yapılabilir.
+
+            Text(text = "Author: ${commit.author?.name ?: "Bilinmiyor"}")
+            Text(text = "Commit ID: ${commit.commitId}")
+        }
+    }
+}
+/*
 @Composable
 fun CommitItem(commit: Commit) {
     Card(
@@ -142,4 +218,4 @@ fun CommitItem(commit: Commit) {
             Text(text = "Changes: +${commit.changeCounts.add} -${commit.changeCounts.delete} ~${commit.changeCounts.edit}")
         }
     }
-}
+}*/
