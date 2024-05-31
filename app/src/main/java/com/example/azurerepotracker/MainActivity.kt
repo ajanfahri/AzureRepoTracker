@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 
 import androidx.compose.foundation.layout.Column
@@ -159,7 +160,8 @@ fun AzureRepoTrackerApp(viewModel: MainViewModel = viewModel()) {
 fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i parametre olarak alır
 
     val uiState by viewModel.uiState.collectAsState()  // collectAsState kullanın
-
+    var showDialog by remember { mutableStateOf(false) }  // Dialog durumu
+    var selectedCommit by remember { mutableStateOf<Commit?>(null) } // Seçili commit
 
     LazyColumn {
         items(uiState.repositories.size) { index -> // Her bir repository için bir öğe oluştur
@@ -176,7 +178,11 @@ fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i para
                 ) // Repo adını göster
 
                 repository.commits.last()?.let { commit -> // Son commit varsa
-                    CommitItem(commit)
+                    CommitItem(commit){
+                            clickedCommit -> // Tıklama işlevi
+                        selectedCommit = clickedCommit
+                        showDialog = true
+                    }
                 } ?: Text("Bu repoda commit bulunamadı.") // Commit yoksa mesaj göster
             }
         }
@@ -191,14 +197,29 @@ fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i para
             }
         }
     }
+    // Dialog
+    if (showDialog && selectedCommit != null) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Commit Detayları") },
+            text = { CommitDetailsContent(selectedCommit!!) }, // Commit detaylarını göster
+            confirmButton = {
+                Button(onClick = { showDialog = false }) {
+                    Text("Kapat")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun CommitItem(commit: Commit) {
+fun CommitItem(commit: Commit, onClick:(Commit)->Unit) {
 
     Card(modifier = Modifier
         .fillMaxWidth()
-        .padding(8.dp)) {
+        .padding(8.dp)
+        .clickable{ onClick(commit) }
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
             Text(text = commit.comment ?: "Commit Mesajı Yok")
@@ -218,6 +239,16 @@ fun CommitItem(commit: Commit) {
                 Text(text = "Tarih: $formattedDate")
             }
         }
+    }
+}
+
+@Composable
+fun CommitDetailsContent(commit: Commit) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text(text = "Commit ID: ${commit.commitId}")
+        Text(text = "Mesaj: ${commit.comment ?: "Mesaj Yok"}")
+        Text(text = "Yazar: ${commit.author?.name ?: "Bilinmiyor"}")
+        // ... diğer detaylar
     }
 }
 /*
