@@ -87,7 +87,7 @@ fun getLocalProperty(name: String): String? {
 data class RepositoryInfo(val owner: String, val name: String)
 dependencies {
     implementation(platform(libs.androidx.compose.bom)) // Compose BOM'u kullanın
-
+    implementation("androidx.navigation:navigation-compose:2.7.5")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

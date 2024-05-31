@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -51,6 +52,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -71,6 +76,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AzureRepoTrackerApp(viewModel: MainViewModel = viewModel()) {
+    val navController = rememberNavController() // NavHostController burada tanımlanıyor
+
     val uiState by viewModel.uiState.collectAsState() // uiState'i collectAsState ile alın
 
     val retrofit = Retrofit.Builder()
@@ -98,47 +105,19 @@ fun AzureRepoTrackerApp(viewModel: MainViewModel = viewModel()) {
                 }
             )
         }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            when {
-                uiState.isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        CircularProgressIndicator()
-                    }
-                }
-
-                uiState.error != null -> {
-                    Text(
-                        text = "Hata: ${uiState.error}",
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                    )
-                }
-                else -> {
-                    RepoListScreen(viewModel)
-                    /*viewModel.uiState.repositories.let { repositories -> // repositories listesini al
-                        if (repositories.isNotEmpty()) { // Liste boş değilse
-                            LazyColumn {
-                                items(repositories) { repository -> // Her repository için
-                                    repository.commits?.let { commits -> // Commitler varsa
-                                        items(commits) { commit ->
-                                            CommitItem(commit)
-                                        }
-                                    } ?: Text(text = "Bu repoda commit bulunamadı.") // Commit yoksa
-                                }
-                            }
-                        } else {
-                            Text(text = "Repo bulunamadı.", modifier = Modifier.align(Alignment.Center)) // Hiç repo yoksa
-                        }
-                    }*/
-                    /*viewModel.uiState.repository?.commits?.let { commits ->
-                        LazyColumn {
-                            items(commits) { commit ->
-                                CommitItem(commit)
-                            }
-                        }
-                    } ?: Text(text = "Repo bulunamadı.", modifier = Modifier.align(Alignment.Center)) */// repository null ise yapılacaklar
-                }
+    ) {
+        innerPadding -> // Scaffold'un content parametresi
+        NavHost( // NavHost'u Scaffold'un içine alın
+            navController = navController,
+            startDestination = "repo_list",
+            modifier = Modifier.padding(innerPadding) // Scaffold'un padding'ini uygulayın
+        ) {
+            composable("repo_list") {
+                RepoListScreen(viewModel, navController)
+            }
+            composable("repo_details/{repoName}") { backStackEntry ->
+                val repoName = backStackEntry.arguments?.getString("repoName") ?: ""
+                RepoDetailsScreen(repoName, viewModel, navController)
             }
         }
     }
@@ -156,8 +135,10 @@ fun AzureRepoTrackerApp(viewModel: MainViewModel = viewModel()) {
         )
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i parametre olarak alır
+fun RepoListScreen(viewModel: MainViewModel = viewModel(),navController: NavHostController) { // ViewModel'i parametre olarak alır
 
     val uiState by viewModel.uiState.collectAsState()  // collectAsState kullanın
     var showDialog by remember { mutableStateOf(false) }  // Dialog durumu
@@ -169,7 +150,10 @@ fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i para
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    .clickable {
+                        navController.navigate("repo_details/${repository.name}")
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(text = repository.name, fontWeight = FontWeight.Bold,
@@ -212,6 +196,7 @@ fun RepoListScreen(viewModel: MainViewModel = viewModel()) { // ViewModel'i para
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommitItem(commit: Commit, onClick:(Commit)->Unit) {
 
@@ -242,6 +227,7 @@ fun CommitItem(commit: Commit, onClick:(Commit)->Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommitDetailsContent(commit: Commit) {
     Column(modifier = Modifier.padding(16.dp)) {
@@ -249,6 +235,37 @@ fun CommitDetailsContent(commit: Commit) {
         Text(text = "Mesaj: ${commit.comment ?: "Mesaj Yok"}")
         Text(text = "Yazar: ${commit.author?.name ?: "Bilinmiyor"}")
         // ... diğer detaylar
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RepoDetailsScreen(repositoryName: String, viewModel: MainViewModel,navController: NavHostController) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    // Repo'yu bul
+    val repo = uiState.repositories.find { it.name == repositoryName }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(text = repositoryName) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) { // Geri butonu
+                        Icon(Icons.Filled.ArrowBack, "back")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        LazyColumn(modifier = Modifier.padding(innerPadding)) {
+            items(repo?.commits ?: emptyList()) { commit ->
+                CommitItem(commit) { clickedCommit ->
+                    // Burada commit'e tıklanınca ne yapılacağını belirleyebilirsiniz.
+                    // Örneğin, bir dialog açabilir veya başka bir sayfaya gidebilirsiniz.
+                }
+            }
+        }
     }
 }
 /*
